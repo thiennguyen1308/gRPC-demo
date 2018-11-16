@@ -5,17 +5,17 @@ import com.faber.service.HelloRequest;
 import com.faber.service.HelloResponse;
 import com.faber.service.HelloServiceGrpc;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
 import java.util.Iterator;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 //</editor-fold>
 
 /**
@@ -27,8 +27,8 @@ public class GRPC_client {
     public static ManagedChannel channel = null;
 
     public static void main(String[] args) throws InterruptedException {
-        Logger.getLogger("io.netty").setLevel(Level.OFF); // Disable log of netty in console
         int coreProcess = Runtime.getRuntime().availableProcessors();//Get num of core process of OS
+        EventLoopGroup bossEventGroup = new NioEventLoopGroup(coreProcess * 2);// should be = core process for best performance
 
         //Create executor pool for execute send request and get response
         Executor executor = Executors.newFixedThreadPool(coreProcess * 4, new ThreadFactory() {//4 * coreProcess thread is enough for high performance
@@ -43,11 +43,13 @@ public class GRPC_client {
             }
         });
         //Create GRPC client to host
-        channel = ManagedChannelBuilder.forAddress("localhost", 9000)
+        channel = NettyChannelBuilder.forAddress("172.30.4.165", 9000)
                 .usePlaintext()//get response as plain text
-                .enableRetry()
+                .enableRetry()//enable retry when lost connection
                 .maxRetryAttempts(5)//attempt to connect 5 times before throw error
-                .maxInboundMessageSize(Integer.MAX_VALUE)
+                .maxInboundMessageSize(Integer.MAX_VALUE)//
+                .eventLoopGroup(bossEventGroup)// thread for execute request
+                .enableFullStreamDecompression()//enable compression stream in client and server
                 .executor(executor)
                 .build();
 
@@ -174,10 +176,6 @@ public class GRPC_client {
                         while (requestStream.isReady()) {
                             for (int i = 0; i < Integer.MAX_VALUE; i++) {
                                 System.out.println("Streaming data to server: name" + i);
-//                                try {
-//                                    Thread.sleep(200);
-//                                } catch (InterruptedException ex) {
-//                                }
                                 HelloRequest request = HelloRequest.newBuilder().setFirstName("name " + i).build();
                                 requestStream.onNext(request);
 

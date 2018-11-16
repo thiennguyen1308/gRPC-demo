@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 //</editor-fold>
 
 /*
@@ -23,7 +24,7 @@ public class GRPC_server {
         //In linux, use epoll instead NIO
         NioEventLoopGroup bossEventGroup = new NioEventLoopGroup(coreProcess);// should be = core process for best performance
         NioEventLoopGroup workerEventGroup = new NioEventLoopGroup(coreProcess * 2);// should be = core process * 2 for best performance
-       
+
         //4 * coreProcess thread is enough for high performance
         Executor executor = Executors.newFixedThreadPool(coreProcess * 4, new ThreadFactory() {
             @Override
@@ -38,11 +39,16 @@ public class GRPC_server {
 
         Server server = NettyServerBuilder//Use netty server instead normal serverBuilder for best performance
                 .forPort(9000)
+                .flowControlWindow(10000)
                 .executor(executor)
                 .bossEventLoopGroup(bossEventGroup)// thread for get request
                 .workerEventLoopGroup(workerEventGroup)// thread for execute request
-                .maxInboundMessageSize(100000000) // 100 mb = 100000000 bytes
-                .addService(new HelloServiceImpl())//Must implement 1 or more service 
+                .maxInboundMessageSize(Integer.MAX_VALUE) // 100 mb = 100000000 bytes
+                .addService(new HelloServiceImpl())//Must implement 1 or more service
+                .keepAliveTime(20, TimeUnit.SECONDS)//send keep alive each 30 seconds
+                .keepAliveTimeout(2, TimeUnit.MINUTES)//timeout after keep alive
+                .maxConnectionIdle(2, TimeUnit.MINUTES)//allow connection idle in 30 seconds
+                .permitKeepAliveWithoutCalls(true)//enable ping to check alive
                 .build();
 
         server.start();
