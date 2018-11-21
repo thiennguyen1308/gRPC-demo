@@ -3,16 +3,9 @@ package com.faber.service;
 //<editor-fold defaultstate="collapsed" desc="IMPORT">
 import com.faber.service.HelloServiceGrpc.HelloServiceImplBase;
 import io.grpc.Context;
-import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import io.netty.handler.codec.http2.Http2Exception;
-import io.netty.handler.codec.http2.Http2Exception.StreamException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 //</editor-fold>
 
 /**
@@ -22,26 +15,42 @@ import java.util.logging.Logger;
  */
 public class HelloServiceImpl extends HelloServiceImplBase {
 
+//    @Override
+//    public void hello(HelloRequest request, StreamObserver<HelloResponse> responseObserver) {
+//
+//        ServerCallStreamObserver serverCallStreamObserver = (ServerCallStreamObserver) responseObserver;
+//        serverCallStreamObserver.setMessageCompression(true);//enable message compression
+//        serverCallStreamObserver.setCompression("gzip");//use compression type
+//        String greeting = new StringBuilder().append("Hello, ")
+//                .append(request.getFirstName())
+//                .append(" ")
+//                .append(request.getLastName())
+//                .toString();
+//
+//        //Prepare response
+//        HelloResponse response = HelloResponse.newBuilder().setGreeting(greeting).build();
+//
+//        //Response to client
+//        serverCallStreamObserver.onNext(response);
+//        serverCallStreamObserver.onCompleted();
+//    }
+
     @Override
     public void hello(HelloRequest request, StreamObserver<HelloResponse> responseObserver) {
-        ServerCallStreamObserver serverCallStreamObserver = (ServerCallStreamObserver) responseObserver;
-        serverCallStreamObserver.setMessageCompression(true);
-        serverCallStreamObserver.setCompression("gzip");
-        System.out.println("Get request " + request.getFirstName() + " " + request.getLastName());
-        String greeting = new StringBuilder().append("Hello, ")
+
+        String responseString = new StringBuilder().append("Hello, ")
                 .append(request.getFirstName())
                 .append(" ")
                 .append(request.getLastName())
                 .toString();
 
         //Prepare response
-        HelloResponse response = HelloResponse.newBuilder()
-                .setGreeting(greeting)
-                .build();
+        HelloResponse response = HelloResponse.newBuilder().setGreeting(responseString).build();
 
         //Response to client
-        serverCallStreamObserver.onNext(response);
-        serverCallStreamObserver.onCompleted();
+        responseObserver.onNext(response);
+        //Tell client that server complete sending response
+        responseObserver.onCompleted();
     }
 
     @Override
@@ -49,7 +58,7 @@ public class HelloServiceImpl extends HelloServiceImplBase {
         ServerCallStreamObserver serverCallStreamObserver = (ServerCallStreamObserver) responseObserver;
         serverCallStreamObserver.setMessageCompression(true);//enable compression
         serverCallStreamObserver.setCompression("gzip");//use gzip as compression
-        for (int i = 0; i < Integer.MAX_VALUE && !Context.current().isCancelled(); i++) {// check if client is connected
+        for (int i = 0; i < 10 && !Context.current().isCancelled(); i++) {// check if client is connected
             String greeting = new StringBuilder().append("Hello, ")
                     .append(request.getFirstName())
                     .append(" ")

@@ -14,6 +14,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import java.util.Iterator;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 //</editor-fold>
@@ -30,18 +31,6 @@ public class GRPC_client {
         int coreProcess = Runtime.getRuntime().availableProcessors();//Get num of core process of OS
         EventLoopGroup bossEventGroup = new NioEventLoopGroup(coreProcess * 2);// should be = core process for best performance
 
-        //Create executor pool for execute send request and get response
-        Executor executor = Executors.newFixedThreadPool(coreProcess * 4, new ThreadFactory() {//4 * coreProcess thread is enough for high performance
-
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r, "gRPC executor pool");
-                thread.setUncaughtExceptionHandler((t, e) -> {
-                    t.interrupt();
-                });
-                return thread;
-            }
-        });
         //Create GRPC client to host
         channel = NettyChannelBuilder.forAddress("172.30.4.165", 9000)
                 .usePlaintext()//get response as plain text
@@ -50,7 +39,9 @@ public class GRPC_client {
                 .maxInboundMessageSize(Integer.MAX_VALUE)//
                 .eventLoopGroup(bossEventGroup)// thread for execute request
                 .enableFullStreamDecompression()//enable compression stream in client and server
-                .executor(executor)
+                .executor(new ForkJoinPool(coreProcess * 4, ForkJoinPool.defaultForkJoinWorkerThreadFactory, (Thread t, Throwable e) -> {
+                    t.interrupt();
+                }, true))
                 .build();
 
         //request -> response
