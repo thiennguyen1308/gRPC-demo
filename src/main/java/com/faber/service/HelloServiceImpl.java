@@ -1,10 +1,14 @@
 package com.faber.service;
 
 //<editor-fold defaultstate="collapsed" desc="IMPORT">
+import com.faber.main.VertXUtils;
 import com.faber.service.HelloServiceGrpc.HelloServiceImplBase;
 import io.grpc.Context;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import io.vertx.core.eventbus.DeliveryOptions;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
 import java.util.concurrent.atomic.AtomicBoolean;
 //</editor-fold>
 
@@ -34,7 +38,6 @@ public class HelloServiceImpl extends HelloServiceImplBase {
 //        serverCallStreamObserver.onNext(response);
 //        serverCallStreamObserver.onCompleted();
 //    }
-
     @Override
     public void hello(HelloRequest request, StreamObserver<HelloResponse> responseObserver) {
 
@@ -43,6 +46,17 @@ public class HelloServiceImpl extends HelloServiceImplBase {
                 .append(" ")
                 .append(request.getLastName())
                 .toString();
+
+//        VertXUtils.eventBus.send("hello", new JsonObject().put("hgaha", Boolean.FALSE), resultGet -> {
+//            int a = 1 / 0;
+//            //Prepare response
+//            HelloResponse response = HelloResponse.newBuilder().setGreeting(resultGet.result().body().toString()).build();
+//
+//            //Response to client
+//            responseObserver.onNext(response);
+//            responseObserver.onCompleted();
+//
+//        });
 
         //Prepare response
         HelloResponse response = HelloResponse.newBuilder().setGreeting(responseString).build();

@@ -11,11 +11,9 @@ import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.vertx.core.http.HttpServerResponse;
 import java.util.Iterator;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 //</editor-fold>
 
@@ -52,10 +50,6 @@ public class GRPC_client {
         blockingStreamingConnect();//blocking connect to hello function and get streaming response
         nonBlockingStreamingConnect();//blocking connect to hello function and get streaming response
 
-        //!!!!!!!! in develop
-        //(streaming)request -> (Streaming) response
-        blockingStreamingBiConnect();//blocking connect to hello function and get streaming response
-
         channel.awaitTermination(60, TimeUnit.MINUTES);//shutdown hangout
     }
 
@@ -66,7 +60,7 @@ public class GRPC_client {
                 .setFirstName("Baeldung")
                 .setLastName("gRPC")
                 .build());
-        System.out.println("get async response: " + helloResponse.getGreeting());
+        System.out.println("get blocking response: " + helloResponse.getGreeting());
     }
 
     public static void nonBlockingConnect() {
@@ -95,12 +89,14 @@ public class GRPC_client {
     public static void blockingStreamingConnect() {
         //Connect to service by blocking method
         HelloServiceGrpc.HelloServiceBlockingStub stub = HelloServiceGrpc.newBlockingStub(channel);
-
+        
+        //Get multiple response
         Iterator<HelloResponse> helloResponses = stub.helloStreaming(HelloRequest.newBuilder()
                 .setFirstName("Baeldung")
                 .setLastName("gRPC")
                 .build());
-
+        
+        //do sth with each response
         while (helloResponses.hasNext()) {
             HelloResponse helloResponse = helloResponses.next();
             System.out.println("Get streaming response blocking: " + helloResponse.getGreeting());
@@ -128,77 +124,6 @@ public class GRPC_client {
             public void onCompleted() {
             }
         });
-    }
-
-    public static void blockingStreamingBiConnect() {
-        //Connect to service by blocking method
-        HelloServiceGrpc.HelloServiceStub stub = HelloServiceGrpc.newStub(channel);
-        // When using manual flow-control and back-pressure on the client, the ClientResponseObserver handles both
-        // request and response streams.
-        ClientResponseObserver<HelloRequest, HelloResponse> clientResponseObserver
-                = new ClientResponseObserver<HelloRequest, HelloResponse>() {
-
-            ClientCallStreamObserver<HelloRequest> requestStream;
-
-            @Override
-            public void beforeStart(final ClientCallStreamObserver<HelloRequest> requestStream) {
-                this.requestStream = requestStream;
-                // Set up manual flow control for the response stream. It feels backwards to configure the response
-                // stream's flow control using the request stream's observer, but this is the way it is.
-                requestStream.disableAutoInboundFlowControl();
-
-                // Set up a back-pressure-aware producer for the request stream. The onReadyHandler will be invoked
-                // when the consuming side has enough buffer space to receive more messages.
-                //
-                // Messages are serialized into a transport-specific transmit buffer. Depending on the size of this buffer,
-                // MANY messages may be buffered, however, they haven't yet been sent to the server. The server must call
-                // request() to pull a buffered message from the client.
-                //
-                // Note: the onReadyHandler's invocation is serialized on the same thread pool as the incoming
-                // StreamObserver'sonNext(), onError(), and onComplete() handlers. Blocking the onReadyHandler will prevent
-                // additional messages from being processed by the incoming StreamObserver. The onReadyHandler must return
-                // in a timely manor or else message processing throughput will suffer.
-                requestStream.setOnReadyHandler(new Runnable() {
-                    // An iterator is used so we can pause and resume iteration of the request data.
-
-                    @Override
-                    public void run() {
-                        // Start generating values from where we left off on a non-gRPC thread.
-                        while (requestStream.isReady()) {
-                            for (int i = 0; i < Integer.MAX_VALUE; i++) {
-                                System.out.println("Streaming data to server: name" + i);
-                                HelloRequest request = HelloRequest.newBuilder().setFirstName("name " + i).build();
-                                requestStream.onNext(request);
-
-                            }
-                            requestStream.onCompleted();
-
-                        }
-
-                    }
-                });
-            }
-
-            @Override
-            public void onNext(HelloResponse value) {
-                // Signal the sender to send one message.
-                System.out.println("get data streaming bidirectional " + value.getGreeting());
-                requestStream.request(1);
-            }
-
-            @Override
-            public void onError(Throwable t) {
-                requestStream.request(1);
-
-                System.out.println(t.getStackTrace());
-            }
-
-            @Override
-            public void onCompleted() {
-            }
-        };
-
-        stub.helloStreamingBidirectional(clientResponseObserver);
     }
 
 }
